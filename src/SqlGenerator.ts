@@ -205,7 +205,7 @@ export abstract class SqlGenerator {
 		return sql;
 	}
 
-	protected transformSelectQueryToSql(query: SelectQuery<any, any, any>, context: Context): string {
+	protected transformSelectQueryToSql(query: SelectQuery<any, any, any, any>, context: Context): string {
 		const data = query.getState();
 		let sql = "SELECT";
 
@@ -244,6 +244,10 @@ export abstract class SqlGenerator {
 		}
 		if (data.offset) {
 			sql += " OFFSET " + this.expressionToSql(data.offset, expressionContext);
+		}
+
+		if (data.forUpdate) {
+			sql += " FOR UPDATE";
 		}
 
 		return sql;

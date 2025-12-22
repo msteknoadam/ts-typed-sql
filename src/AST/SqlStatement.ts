@@ -6,7 +6,7 @@ import { ValuesQuery } from "./Queries/ValuesQuery";
 
 export type SqlStatement = DeleteQuery<any, any, any>
 	| InsertQuery<any, any, any>
-	| SelectQuery<any, any, any>
+	| SelectQuery<any, any, any, any>
 	| UpdateQuery<any, any, any, any>
 	| ValuesQuery<any>
 	| StartTransactionStatement
