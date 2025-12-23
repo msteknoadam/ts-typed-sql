@@ -18,7 +18,9 @@ export function insertInto<TTable extends Table<any, any>>(table: TTable):
 }
 
 export type InsertRows<TRequiredColumns extends { [key: string]: any }, TOptionalColumns extends { [key: string]: any }> = (MapExpressionOrInputValue<TRequiredColumns> & Partial<MapExpressionOrInputValue<TOptionalColumns>>)[];
-export type InsertRowQuery<TRequiredColumns, TOptionalColumns> = RetrievalQuery<TRequiredColumns & Partial<TOptionalColumns>, any>;
+export type InsertRowQuery<TRequiredColumns extends Row, TOptionalColumns> = 
+    RetrievalQuery<TRequiredColumns, any>;
+
 
 /**
  * Represents an INSERT INTO statement that needs values.
@@ -46,7 +48,12 @@ export class InsertQueryBuilder<TRequiredColumns extends Row, TOptionalColumns e
 	 * Uses a subquery to retrieve the items to be inserted.
 	 * @param query A query that returns the items to be inserted.
 	 */
-	public valuesFrom(query: InsertRowQuery<TRequiredColumns, TOptionalColumns>): InsertQuery<TRequiredColumns & TOptionalColumns, {}, NoColumnsSelected> {
+	public valuesFrom<TQueryColumns extends TRequiredColumns>(
+		query: RetrievalQuery<TQueryColumns, any> & 
+			(Exclude<keyof TQueryColumns, keyof (TRequiredColumns & TOptionalColumns)> extends never 
+				? unknown 
+				: ErrorMessage<"Query contains columns that are not in the table">)
+	): InsertQuery<TRequiredColumns & TOptionalColumns, {}, NoColumnsSelected> {
 		return new InsertQuery<TRequiredColumns & TOptionalColumns, {}, NoColumnsSelected>(this.table, query);
 	}
 }
