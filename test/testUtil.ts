@@ -17,8 +17,8 @@ export function checkResult({
 	expectedResult:  { sql: string; parameters: any[] };
 }) {
 	const gotResult = JSON.parse(JSON.stringify(generator.toSql(query)));
-	gotResult.sql = sqlFormatter.format(gotResult.sql);
-	expectedResult.sql = sqlFormatter.format(expectedResult.sql);
+	gotResult.sql = sqlFormatter.format(gotResult.sql, { language: "postgresql" });
+	expectedResult.sql = sqlFormatter.format(expectedResult.sql, { language: "postgresql" });
 	assert.equal(gotResult.sql, expectedResult.sql);
 	assert.deepStrictEqual(gotResult.parameters, expectedResult.parameters);
 }
