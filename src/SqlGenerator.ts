@@ -396,6 +396,13 @@ export abstract class SqlGenerator {
 
 					return `${left} ${operator} ${right}`;
 				})
+				.register(Exprs.CaseExpression, (e, context) => {
+					const whenClauses = e.whenClauses.map(c =>
+						`WHEN ${this.expressionToSql(c.condition, context)} THEN ${this.expressionToSql(c.result, context)}`
+					).join(" ");
+					const elseClause = e.elseResult ? ` ELSE ${this.expressionToSql(e.elseResult, context)}` : "";
+					return `CASE ${whenClauses}${elseClause} END`;
+				})
 				.register(Exprs.KnownFunctionInvocation, (e, context) => {
 					const functionName = e.functionName.toUpperCase();
 					const args = e.args.map(arg => this.expressionToSql(arg, context)).join(", ");
