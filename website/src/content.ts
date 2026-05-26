@@ -1,4 +1,4 @@
-import { select, from, val, table, tText, tInteger, tJson, jsonVal, concat, deleteFrom, insertInto, values, update } from "hediet-typed-sql";
+import { select, from, val, table, tText, tInteger, tJson, jsonVal, concat, deleteFrom, insertInto, values, update } from "../../src";
 
 // table definitions.
 const organizations = table("organizations",
