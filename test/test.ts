@@ -195,6 +195,38 @@ describe("Select", () => {
 		});
 	});
 
+	describe("For Update", () => {
+		it("should support forUpdate", () => {
+			check(
+				from(contacts).select(contacts.id).forUpdate(),
+				`SELECT id FROM contacts FOR UPDATE`
+			);
+
+			check(
+				select(contacts.firstname).from(contacts).where({ id: 1 }).forUpdate(),
+				`SELECT firstname FROM contacts WHERE id = $1 FOR UPDATE`, [1]
+			);
+
+			check(
+				from(contacts).select(contacts.id).orderBy("id").forUpdate(),
+				`SELECT id FROM contacts ORDER BY id FOR UPDATE`
+			);
+
+			check(
+				from(contacts).select(contacts.id).limit(10).forUpdate(),
+				`SELECT id FROM contacts LIMIT $1 FOR UPDATE`, [10]
+			);
+		});
+
+		it("should prevent calling forUpdate twice", () => {
+			const query = from(contacts).select(contacts.id).forUpdate();
+
+			assert.throws(() => {
+				query.forUpdate(); // Error: forUpdate() can only be called once per query
+			});
+		});
+	});
+
 	describe("Order By", () => {
 		it("should support order by", () => {
 			check(

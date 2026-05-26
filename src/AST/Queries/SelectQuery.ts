@@ -14,12 +14,13 @@ import { Simplify, NmdExpr, NmdExprToRow, handleSelect, resolveColumnReference, 
 import { JoinConditionBuilder, doJoin } from "./JoinMixin";
 import { secondWithTypeOfFirst } from "../../Helpers";
 
-export class SelectQuery<TSelectedCols extends Row, TFromTblCols extends Row, TSingleColumn extends SingleColumn<TSelectedCols>>
+export class SelectQuery<TSelectedCols extends Row, TFromTblCols extends Row, TSingleColumn extends SingleColumn<TSelectedCols>, THasForUpdate extends boolean = false>
 	extends RetrievalQuery<TSelectedCols, TSingleColumn>
 {
 	private _orderBys: Ordering<Expression<AnyType>>[] = [];
 	private _havingCondition: Expression<BooleanType> | undefined;
 	private _groupBys: Expression<AnyType>[] = [];
+	private _forUpdate: boolean = false;
 
 	public getState() {
 		return Object.assign({
@@ -27,7 +28,8 @@ export class SelectQuery<TSelectedCols extends Row, TFromTblCols extends Row, TS
 			whereCondition: this._whereCondition,
 			havingCondition: this._havingCondition,
 			groupBys: this._groupBys,
-			from: this._from
+			from: this._from,
+			forUpdate: this._forUpdate
 		}, super.getState());
 	}
 
@@ -36,7 +38,7 @@ export class SelectQuery<TSelectedCols extends Row, TFromTblCols extends Row, TS
 	 * @param table The table to select from.
 	 */
 	public from<TTableColumns extends HardRow>(table: FromItem<TTableColumns>):
-			SelectQuery<TSelectedCols, TTableColumns, TSingleColumn> {
+			SelectQuery<TSelectedCols, TTableColumns, TSingleColumn, THasForUpdate> {
 		this._from = FromFactor.crossJoin(this._from, table);
 		this.lastFromItem = table as FromItem<any>;
 		return this as any;
@@ -44,46 +46,59 @@ export class SelectQuery<TSelectedCols extends Row, TFromTblCols extends Row, TS
 
 
 	/** Selects all columns from the given table. */
-	public select<T extends Row>(table: AllExpression<T>): SelectQuery<Simplify<TSelectedCols & {[TName in keyof T]: T[TName]}>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T extends Row>(table: AllExpression<T>): SelectQuery<Simplify<TSelectedCols & {[TName in keyof T]: T[TName]}>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects a single named expression. */
-	public select<T1 extends NmdExpr>(this: SelectQuery<TSelectedCols, TFromTblCols, NoColumnsSelected> | void, expr1: T1): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1>>, TFromTblCols, NamedExpressionNameOf<T1>>;
+	public select<T1 extends NmdExpr>(this: SelectQuery<TSelectedCols, TFromTblCols, NoColumnsSelected, THasForUpdate> | void, expr1: T1): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1>>, TFromTblCols, NamedExpressionNameOf<T1>, THasForUpdate>;
 
 	/** Selects 1 named expressions. */
-	public select<T1 extends NmdExpr>(expr1: T1): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr>(expr1: T1): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects 2 named expressions. */
-	public select<T1 extends NmdExpr, T2 extends NmdExpr>(expr1: T1, expr2: T2): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr, T2 extends NmdExpr>(expr1: T1, expr2: T2): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects 3 named expressions. */
-	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects 4 named expressions. */
-	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects 5 named expressions. */
-	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects 6 named expressions. */
-	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr, T6 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5, expr6: T6): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5> & NmdExprToRow<T6>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr, T6 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5, expr6: T6): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5> & NmdExprToRow<T6>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects 7 named expressions. */
-	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr, T6 extends NmdExpr, T7 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5, expr6: T6, expr7: T7): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5> & NmdExprToRow<T6> & NmdExprToRow<T7>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr, T6 extends NmdExpr, T7 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5, expr6: T6, expr7: T7): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5> & NmdExprToRow<T6> & NmdExprToRow<T7>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects 8 named expressions. */
-	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr, T6 extends NmdExpr, T7 extends NmdExpr, T8 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5, expr6: T6, expr7: T7, expr8: T8): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5> & NmdExprToRow<T6> & NmdExprToRow<T7> & NmdExprToRow<T8>>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<T1 extends NmdExpr, T2 extends NmdExpr, T3 extends NmdExpr, T4 extends NmdExpr, T5 extends NmdExpr, T6 extends NmdExpr, T7 extends NmdExpr, T8 extends NmdExpr>(expr1: T1, expr2: T2, expr3: T3, expr4: T4, expr5: T5, expr6: T6, expr7: T7, expr8: T8): SelectQuery<Simplify<TSelectedCols & NmdExprToRow<T1> & NmdExprToRow<T2> & NmdExprToRow<T3> & NmdExprToRow<T4> & NmdExprToRow<T5> & NmdExprToRow<T6> & NmdExprToRow<T7> & NmdExprToRow<T8>>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	/** Selects a single column that is currently in scope. */
-	public select<TColumnName extends keyof TFromTblCols & string>(this: SelectQuery<TSelectedCols, TFromTblCols, NoColumnsSelected>, column1: TColumnName): SelectQuery<Simplify<TSelectedCols & {[TName in TColumnName]: TFromTblCols[TName]}>, TFromTblCols, TColumnName>;
+	public select<TColumnName extends keyof TFromTblCols & string>(this: SelectQuery<TSelectedCols, TFromTblCols, NoColumnsSelected, THasForUpdate>, column1: TColumnName): SelectQuery<Simplify<TSelectedCols & {[TName in TColumnName]: TFromTblCols[TName]}>, TFromTblCols, TColumnName, THasForUpdate>;
 
 	/** Selects columns that are currently in scope. */
-	public select<TColumnNames extends keyof TFromTblCols & string>(...columns: TColumnNames[]): SelectQuery<Simplify<TSelectedCols & {[TName in TColumnNames]: TFromTblCols[TName]}>, TFromTblCols, MoreThanOneColumnSelected>;
+	public select<TColumnNames extends keyof TFromTblCols & string>(...columns: TColumnNames[]): SelectQuery<Simplify<TSelectedCols & {[TName in TColumnNames]: TFromTblCols[TName]}>, TFromTblCols, MoreThanOneColumnSelected, THasForUpdate>;
 
 	public select(this: ErrorMessage<"Expressions must have names. Use expr.as('name').">, ...expr: Expression<any>[]): "Error";
 
 	public select(...args: ((keyof TFromTblCols) | NmdExpr | AllExpression<any> | Expression<any>)[]): any {
 		handleSelect(this.lastFromItem, args as any, this.returningColumns as any, this.selectedExpressions);
 		return this;
+	}
+
+	/**
+	 * Adds a FOR UPDATE clause to this query, which locks the selected rows for update.
+	 * This method can only be called once per query.
+	 */
+	public forUpdate(this: SelectQuery<TSelectedCols, TFromTblCols, TSingleColumn, THasForUpdate>): 
+		THasForUpdate extends true 
+			? ErrorMessage<"forUpdate() can only be called once per query."> 
+			: SelectQuery<TSelectedCols, TFromTblCols, TSingleColumn, true> {
+		if (this._forUpdate) throw new Error("forUpdate() can only be called once per query.");
+		this._forUpdate = true;
+		return this as any;
 	}
 
 	/**
@@ -257,11 +272,11 @@ export class SelectQuery<TSelectedCols extends Row, TFromTblCols extends Row, TS
  * @param table The table to select from.
  */
 export function from<TTableColumns extends HardRow>(table: FromItem<TTableColumns>) {
-	const result = new SelectQuery<{}, {}, NoColumnsSelected>();
+	const result = new SelectQuery<{}, {}, NoColumnsSelected, false>();
 	return result.from(table);
 }
 
-export const select = secondWithTypeOfFirst(new SelectQuery<{}, {}, NoColumnsSelected>().select, function (...args: any[]): any {
-		const result = new SelectQuery<{}, {}, NoColumnsSelected>();
+export const select = secondWithTypeOfFirst(new SelectQuery<{}, {}, NoColumnsSelected, false>().select, function (...args: any[]): any {
+		const result = new SelectQuery<{}, {}, NoColumnsSelected, false>();
 		return result.select.call(result, ...args);
 });
