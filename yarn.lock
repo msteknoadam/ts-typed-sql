@@ -258,9 +258,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@phiresky/typed-sql@workspace:.":
+"@msteknoadam/typed-sql@workspace:.":
   version: 0.0.0-use.local
-  resolution: "@phiresky/typed-sql@workspace:."
+  resolution: "@msteknoadam/typed-sql@workspace:."
   dependencies:
     "@types/debug": "npm:^4.1.12"
     "@types/mocha": "npm:^10.0.10"

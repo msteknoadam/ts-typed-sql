@@ -1,6 +1,6 @@
 {
-  "name": "@phiresky/typed-sql",
-  "version": "0.2.17",
+  "name": "@msteknoadam/typed-sql",
+  "version": "0.2.18",
   "description": "A fully typed sql builder. Works best with TypeScript an Visual Studio Code.",
   "main": "dist/src/index.js",
   "directories": {
@@ -38,13 +38,26 @@
     "cover": "nyc --all --reporter lcov --reporter text-summary yarn test"
   },
   "author": "Henning Dieterichs",
+  "contributors": [
+    {
+      "name": "phiresky",
+      "url": "https://github.com/phiresky"
+    },
+    {
+      "name": "Göktuğ Yeşilyurt",
+      "url": "https://github.com/msteknoadam"
+    }
+  ],
   "license": "MIT",
   "types": "dist/src/index.d.ts",
   "files": [
     "dist/src",
     "src"
   ],
-  "repository": "hediet/ts-typed-sql",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/msteknoadam/ts-typed-sql"
+  },
   "nyc": {
     "exclude": [
       "website"
