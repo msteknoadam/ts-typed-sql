@@ -51,8 +51,7 @@
   "license": "MIT",
   "types": "dist/src/index.d.ts",
   "files": [
-    "dist/src",
-    "src"
+    "dist"
   ],
   "repository": {
     "type": "git",
