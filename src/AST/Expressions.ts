@@ -163,6 +163,155 @@ export function coalesce<T extends AnyType>(...expressions: Expression<T>[]): Ex
 	return new KnownFunctionInvocation("coalesce", expressions, expressions[expressions.length - 1].type);
 }
 
+type NullableCaseType<T extends AnyType> =
+	T extends StandaloneNullType ? T :
+	T extends NullType<any, any, any> ? T :
+	NullType<GetInType<T>, GetOutType<T>, T["_brand"]>;
+
+type MergeCaseTypes<TLeft extends AnyType, TRight extends AnyType> =
+	TLeft extends StandaloneNullType ? NullableCaseType<TRight> :
+	TRight extends StandaloneNullType ? NullableCaseType<TLeft> :
+	TLeft extends TRight ? TRight :
+	TRight extends TLeft ? TLeft :
+	TLeft extends NullType<infer TIn, infer TOut, infer TBrand>
+		? TRight extends Type<TIn, TOut, TBrand> ? TLeft : never
+		: TRight extends NullType<infer TIn, infer TOut, infer TBrand>
+			? TLeft extends Type<TIn, TOut, TBrand> ? TRight : never
+			: never;
+
+export interface CaseWhenClause<T extends AnyType> {
+	condition: Expression<BooleanType>;
+	result: Expression<T>;
+}
+
+function makeNullableCaseType<T extends AnyType>(type: T): NullableCaseType<T> {
+	if (type instanceof NullType || type instanceof StandaloneNullType) return type as NullableCaseType<T>;
+	return type.orNull() as NullableCaseType<T>;
+}
+
+function getCaseTypeBase(type: AnyType): { base: AnyType; isNullable: boolean } {
+	if (type instanceof StandaloneNullType) return { base: type, isNullable: true };
+	if (type instanceof NullType) return { base: (type as any).type as AnyType, isNullable: true };
+	return { base: type, isNullable: false };
+}
+
+function mergeCaseTypeInstances<TLeft extends AnyType, TRight extends AnyType>(left: TLeft, right: TRight): MergeCaseTypes<TLeft, TRight> {
+	if (left instanceof StandaloneNullType) return makeNullableCaseType(right) as MergeCaseTypes<TLeft, TRight>;
+	if (right instanceof StandaloneNullType) return makeNullableCaseType(left) as MergeCaseTypes<TLeft, TRight>;
+
+	const leftBase = getCaseTypeBase(left);
+	const rightBase = getCaseTypeBase(right);
+	if (leftBase.base.constructor !== rightBase.base.constructor) {
+		throw new Error(`CASE expressions must return compatible types, but got '${left.name}' and '${right.name}'.`);
+	}
+
+	if (leftBase.isNullable) return left as MergeCaseTypes<TLeft, TRight>;
+	if (rightBase.isNullable) return right as MergeCaseTypes<TLeft, TRight>;
+	return left as MergeCaseTypes<TLeft, TRight>;
+}
+
+export class CaseExpression<T extends AnyType> extends Expression<T> {
+	constructor(
+		public readonly whenClauses: CaseWhenClause<any>[],
+		public readonly elseResult: Expression<T> | undefined,
+		type: T
+	) {
+		super(type);
+		if (whenClauses.length === 0) throw new Error("CASE expression requires at least one WHEN clause.");
+	}
+}
+
+export class CaseExpressionStartBuilder {
+	public when(condition: Expression<BooleanType>): CaseExpressionPendingThenBuilder {
+		return new CaseExpressionPendingThenBuilder([], condition);
+	}
+}
+
+export class CaseExpressionPendingThenBuilder {
+	constructor(
+		private readonly whenClauses: CaseWhenClause<any>[],
+		private readonly condition: Expression<BooleanType>
+	) { }
+
+	public then<TResult extends AnyType>(result: Expression<TResult>): CaseExpressionBuilder<TResult> {
+		return new CaseExpressionBuilder(
+			[...this.whenClauses, { condition: this.condition, result }],
+			result.type
+		);
+	}
+}
+
+export class CaseExpressionPendingCompatibleThenBuilder<TResult extends AnyType> {
+	constructor(
+		private readonly whenClauses: CaseWhenClause<any>[],
+		private readonly resultType: TResult,
+		private readonly condition: Expression<BooleanType>
+	) { }
+
+	public then(result: GetInType<TResult>): CaseExpressionBuilder<TResult>;
+	public then<TNext extends AnyType>(result: MergeCaseTypes<TResult, TNext> extends never ? never : Expression<TNext>): CaseExpressionBuilder<MergeCaseTypes<TResult, TNext>>;
+	public then(result: GetInType<TResult> | Expression<any>): any {
+		if (result instanceof Expression) {
+			const mergedType = mergeCaseTypeInstances(this.resultType, result.type);
+			return new CaseExpressionBuilder(
+				[...this.whenClauses, { condition: this.condition, result }],
+				mergedType
+			);
+		}
+
+		return new CaseExpressionBuilder(
+			[...this.whenClauses, { condition: this.condition, result: normalize(this.resultType, result) }],
+			this.resultType
+		);
+	}
+}
+
+export class CaseExpressionBuilder<TResult extends AnyType> {
+	constructor(
+		private readonly whenClauses: CaseWhenClause<any>[],
+		private readonly resultType: TResult
+	) { }
+
+	public when(condition: Expression<BooleanType>): CaseExpressionPendingCompatibleThenBuilder<TResult> {
+		return new CaseExpressionPendingCompatibleThenBuilder(this.whenClauses, this.resultType, condition);
+	}
+
+	public else(result: GetInType<TResult>): CaseExpressionCompleteBuilder<TResult>;
+	public else<TElse extends AnyType>(result: MergeCaseTypes<TResult, TElse> extends never ? never : Expression<TElse>): CaseExpressionCompleteBuilder<MergeCaseTypes<TResult, TElse>>;
+	public else(result: GetInType<TResult> | Expression<any>): any {
+		if (result instanceof Expression) {
+			const mergedType = mergeCaseTypeInstances(this.resultType, result.type);
+			return new CaseExpressionCompleteBuilder(this.whenClauses, mergedType, result as any);
+		}
+
+		return new CaseExpressionCompleteBuilder(this.whenClauses, this.resultType, normalize(this.resultType, result));
+	}
+
+	public end(): CaseExpression<NullableCaseType<TResult>> {
+		return new CaseExpression(this.whenClauses, undefined, makeNullableCaseType(this.resultType));
+	}
+}
+
+export class CaseExpressionCompleteBuilder<TResult extends AnyType> {
+	constructor(
+		private readonly whenClauses: CaseWhenClause<any>[],
+		private readonly resultType: TResult,
+		private readonly elseResult: Expression<TResult>
+	) { }
+
+	public end(): CaseExpression<TResult> {
+		return new CaseExpression(this.whenClauses, this.elseResult, this.resultType);
+	}
+}
+
+/**
+ * Creates a searched CASE expression builder:
+ * `caseExpr().when(cond).then(expr).else(other).end()`
+ */
+export function caseExpr(): CaseExpressionStartBuilder {
+	return new CaseExpressionStartBuilder();
+}
+
 export function val(value: null, preferEscaping?: boolean): ValueExpression<StandaloneNullType>;
 export function val(value: string, preferEscaping?: boolean): ValueExpression<TextType>;
 export function val(value: boolean, preferEscaping?: boolean): ValueExpression<BooleanType>;

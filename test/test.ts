@@ -2,7 +2,7 @@ import { objectValues, toObject } from '../src/Helpers';
 import {
 	fromItemTypes,
 	union, unionAll, GetOutType, select, from, table, DbConnection, insertInto, FromItemToOutRow, MapOutType, RowToColumns,
-	update, val, defaultValue, SqlGenerator, PostgreQueryService, concat, not, deleteFrom, Query, PostgreSqlGenerator, values, Expression, tInteger, tText, tJson, ExpressionTypeOf, FromItem, HardRow, tBoolean,
+	update, val, defaultValue, SqlGenerator, PostgreQueryService, concat, not, deleteFrom, Query, PostgreSqlGenerator, values, Expression, tInteger, tText, tJson, ExpressionTypeOf, FromItem, HardRow, tBoolean, caseExpr,
 	Row
 } from "../src/index";
 import * as assert from "assert";
@@ -451,6 +451,54 @@ describe("Expressions", () => {
 		val2 = 10; // should typecheck
 		checkExpression(expr, "$1", [10]);
 	});
+
+	it("should support case expressions with else", () => {
+		const expr = caseExpr()
+			.when(contacts.parentFirstname.isNotNull()).then(contacts.parentFirstname)
+			.else(contacts.firstname)
+			.end();
+
+		let val2: GetOutType<ExpressionTypeOf<typeof expr>>;
+		val2 = "fallback"; // should typecheck
+
+		check(
+			select(expr.as("result")).from(contacts),
+			`SELECT CASE WHEN "parentFirstname" IS NOT NULL THEN "parentFirstname" ELSE firstname END AS result FROM contacts`
+		);
+	});
+
+	it("should support case expressions without else as nullable", () => {
+		const expr = caseExpr()
+			.when(contacts.id.isEqualTo(1)).then(contacts.firstname)
+			.end();
+
+		let val2: GetOutType<ExpressionTypeOf<typeof expr>>;
+		val2 = "match"; // should typecheck
+		val2 = null; // should typecheck
+
+		check(
+			select(expr.as("result")).from(contacts),
+			`SELECT CASE WHEN id = $1 THEN firstname END AS result FROM contacts`,
+			[1]
+		);
+	});
+
+	it("should support case expressions with null else branches", () => {
+		const expr = caseExpr()
+			.when(contacts.id.isEqualTo(1)).then(contacts.firstname)
+			.else(val(null))
+			.end();
+
+		let val2: GetOutType<ExpressionTypeOf<typeof expr>>;
+		val2 = "match"; // should typecheck
+		val2 = null; // should typecheck
+
+		check(
+			select(expr.as("result")).from(contacts),
+			`SELECT CASE WHEN id = $1 THEN firstname ELSE $2 END AS result FROM contacts`,
+			[1, null]
+		);
+	});
 });
 
 
@@ -512,6 +560,21 @@ describe("Update", () => {
 				.set({ firstname: "1" })
 				.returning("id"),
 			`UPDATE contacts SET firstname = $1 FROM contact_addresses WHERE contact_addresses.id = contacts.id AND (address LIKE $2) RETURNING contact_addresses.id`, ["1", "%NYC%"]
+		);
+	});
+
+	it("should support case expressions in update statements", () => {
+		check(
+			update(contacts)
+				.set({
+					firstname: caseExpr()
+						.when(contacts.parentFirstname.isNotNull()).then(contacts.parentFirstname)
+						.else(contacts.firstname)
+						.end()
+				})
+				.where({ id: 0 }),
+			`UPDATE contacts SET firstname = CASE WHEN "parentFirstname" IS NOT NULL THEN "parentFirstname" ELSE firstname END WHERE id = $1`,
+			[0]
 		);
 	});
 });
